@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Story Theatre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f2f0fa;--ink:#1b1a33;--mute:#5d5b7a;--card:#ffffff;--line:#d9d5ee;--accent:#5b4bdb;--accent-ink:#ffffff;--stage:#0e0d22;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#13122a;--ink:#ecebfa;--mute:#a4a2c6;--card:#1c1b3a;--line:#34325c;--accent:#8c7dff;--accent-ink:#13122a;--stage:#07061a}}
+:root[data-theme="dark"]{--bg:#13122a;--ink:#ecebfa;--mute:#a4a2c6;--card:#1c1b3a;--line:#34325c;--accent:#8c7dff;--accent-ink:#13122a;--stage:#07061a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 Nunito,system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:18px 16px 40px}
+h1{font:800 34px/1.05 "Baloo 2",system-ui,sans-serif;margin:6px 0 4px;letter-spacing:-.01em}
+.sub{color:var(--mute);margin:0 0 16px}
+.stage{position:relative;background:var(--stage);border-radius:18px;overflow:hidden;aspect-ratio:16/9;box-shadow:0 0 0 1px var(--line)}
+canvas{width:100%;height:100%;display:block}
+.cap{position:absolute;left:6%;right:6%;bottom:5%;text-align:center;color:#fff;font:700 clamp(13px,3.2vw,22px)/1.3 Nunito,sans-serif;background:rgba(10,10,30,.6);border-radius:12px;padding:8px 12px;display:none}
+.bar{display:flex;gap:8px;align-items:center;margin:12px 0}
+button,select{font:700 16px Nunito,sans-serif;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:12px 16px;min-height:48px}
+button.go{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);flex:1;font-size:18px}
+button:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.status{color:var(--mute);font-size:14px;margin-left:auto}
+label{display:block;font-weight:700;margin:16px 0 6px}
+textarea{width:100%;min-height:230px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:400 15px/1.5 Nunito,sans-serif;padding:14px;resize:vertical}
+select{width:100%}
+details{margin-top:18px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
+summary{font-weight:700;cursor:pointer}
+code,pre{font:13px/1.5 ui-monospace,Menlo,monospace;background:rgba(127,127,160,.14);border-radius:6px}
+pre{padding:10px;overflow-x:auto}
+</style>
+</head>
+<body>
+<main>
+<h1>Story Theatre</h1>
+<p class="sub">Paste a story. A character tells it out loud, moves, blinks and talks along with the words.</p>
+
+<div class="stage"><canvas id="cv" width="960" height="540"></canvas><div class="cap" id="cap"></div></div>
+<div class="bar">
+  <button class="go" id="go">Tell my story</button>
+  <button id="pause" disabled>Pause</button>
+  <span class="status" id="st">Ready</span>
+</div>
+
+<label for="script">Your story</label>
+<textarea id="script" spellcheck="false"></textarea>
+
+<label for="voice">Voice</label>
+<select id="voice"></select>
+
+<details>
+<summary>Two or more characters, and scenes</summary>
+<p>Plain text works as it is: one character reads everything. To add more, use these lines:</p>
+<pre># Characters (the first one is the storyteller)
+@character Kaito | hair=#2a2030, shirt=#2a9d8f, style=short
+@character Mia | hair=#6b3a2a, shirt=#e76f51, style=long
+
+# New scene and background (words like night, forest, sea, village, dawn change the setting)
+[bg: moonlit forest]
+
+# Dialogue
+Mia: “You can’t catch the moon!”</pre>
+</details>
+</main>
+
+<script>
+const SAMPLE = `@character Kaito | hair=#2a2030, shirt=#2a9d8f, style=short
+@character Mia | hair=#6b3a2a, shirt=#e76f51, style=long
+[bg: moonlit forest clearing at night]
+Once upon a time, a boy named Kaito lived at the edge of a quiet forest. Every night he looked up and wondered how it would feel to touch the moon.
+Mia: “You can’t catch the moon, Kaito. It’s much too far away!”
+Kaito: “Then I’ll climb the tallest tree and find out for myself.”
+[bg: a village at dawn, warm morning sun]
+In the morning the whole village was laughing, and Kaito had never felt happier.`;
+const $ = s => document.querySelector(s);
+const cv = $('#cv'), ctx = cv.getContext('2d'), W = 960, H = 540, OUT = '#2d2328';
+$('#script').value = SAMPLE;
+
+/* ---------- script parsing ---------- */
+const PAL = [{skin:'#f6d3b6',hair:'#2a2030',shirt:'#2a9d8f'},{skin:'#e9b998',hair:'#6b3a2a',shirt:'#e76f51'},{skin:'#d9a37c',hair:'#3a2a1a',shirt:'#e9c46a'},{skin:'#f3c9a8',hair:'#8a3b3b',shirt:'#6a7fdb'}];
+function shade(h){const n=parseInt(h.slice(1),16);const f=.88;return '#'+[(n>>16)&255,(n>>8)&255,n&255].map(v=>Math.round(v*f).toString(16).padStart(2,'0')).join('')}
+function parse(t){
+  const st={chars:{},scenes:[],teller:null};let sc=null;
+  for(const raw of t.split('\n')){
+    const l=raw.trim(); if(!l||l[0]==='#') continue;
+    if(/^@character/i.test(l)){
+      const parts=l.slice(10).split('|'); const name=parts[0].trim(); const p={};
+      (parts[1]||'').split(',').forEach(kv=>{const i=kv.indexOf('=');if(i>0)p[kv.slice(0,i).trim()]=kv.slice(i+1).trim()});
+      st.chars[name]=p; if(!st.teller) st.teller=name; continue;
+    }
+    let m=l.match(/^\[bg:\s*(.*)\]$/i);
+    if(m){sc={bg:m[1],lines:[]};st.scenes.push(sc);continue}
+    if(!sc){sc={bg:'',lines:[]};st.scenes.push(sc)}
+    m=l.match(/^([^:]{1,20}):\s*(.+)$/);
+    let sp=null,body=l;
+    if(m&&st.chars[m[1].trim()]){sp=m[1].trim();body=m[2]}
+    sc.lines.push({sp,text:body.replace(/^[“"]|[”"]$/g,'')});
+  }
+  if(!st.teller){st.teller='Storyteller';st.chars[st.teller]={}}
+  Object.keys(st.chars).forEach((n,i)=>{const p=st.chars[n],d=PAL[i%PAL.length];p.skin=p.skin||d.skin;p.hair=p.hair||d.hair;p.shirt=p.shirt||d.shirt;p.shade=shade(p.skin);p.style=p.style||'short';p.idx=i});
+  const queue=[];
+  st.scenes.forEach((s,si)=>{
+    const names=[];
+    s.lines.forEach(l=>{l.sp=l.sp||st.teller;if(!names.includes(l.sp))names.push(l.sp)});
+    s.cast=names.length?names:[st.teller];
+    s.lines.forEach(l=>{(l.text.match(/[^.!?]+[.!?]+["”]?|[^.!?]+$/g)||[l.text]).forEach(sen=>{sen=sen.trim();if(sen)queue.push({sp:l.sp,text:sen,scene:si})})});
+  });
+  return {st,queue};
+}
+
+/* ---------- natural motion ---------- */
+class Spring{constructor(k=40,z=.75){this.x=this.v=this.t=0;this.k=k;this.c=2*z*Math.sqrt(k)}
+  step(dt){const a=this.k*(this.t-this.x)-this.c*this.v;this.v+=a*dt;this.x+=this.v*dt;return this.x}}
+class Rig{
+  constructor(seed){this.ph=Array.from({length:8},(_,i)=>(seed*7.13+i*2.31)%6.28);
+    this.tilt=new Spring(35);this.nod=new Spring(45);this.brow=new Spring(70);this.gest=new Spring(28,.55);this.look=new Spring(20);
+    this.t=0;this.mouth=0;this.nb=1+Math.random()*2;this.bt=-1;this.gc=1;this.gh=0;this.gs=.5;this.ep=0;this.hl=0}
+  update(dt,env,sp){
+    this.t+=dt;const t=this.t,ph=this.ph,e=sp?env:0,R=Math.random;
+    this.tilt.t=1.3*Math.sin(t*.61+ph[0])+.7*Math.sin(t*1.37+ph[1])+2.2*e*Math.sin(t*2.1+ph[2]);
+    this.nod.t=1.5*Math.sin(t*.93+ph[3])+5*e;
+    this.brow.t=(sp&&e>.62)?1:0;
+    this.hl-=dt;if(this.hl<=0){this.look.t=(R()*2-1)*(sp?.5:1);this.hl=.8+R()*1.7}
+    const k=e>this.mouth?38:20;this.mouth+=(e-this.mouth)*(1-Math.exp(-dt*k));
+    this.gc-=dt;
+    if(sp&&e>.5&&e>this.ep&&this.gc<=0&&R()<.5){this.gest.t=.7+R()*.3;this.gh=.45+R()*.45;this.gc=1.3+R()*1.7;this.gs=R()}
+    if(this.gh>0)this.gh-=dt;else this.gest.t=sp?.12:0;
+    this.ep=e;
+    let blink=0;
+    if(this.bt<0&&t>this.nb)this.bt=0;
+    if(this.bt>=0){this.bt+=dt;blink=Math.sin(Math.PI*Math.min(this.bt/.17,1));if(this.bt>.17){this.bt=-1;this.nb=t+(R()<.15?.15:2+R()*3)}}
+    return{tilt:this.tilt.step(dt),nod:this.nod.step(dt),brow:this.brow.step(dt),gest:Math.max(0,this.gest.step(dt)),gs:this.gs,look:this.look.step(dt),mouth:Math.max(0,Math.min(1,this.mouth)),blink,breath:Math.sin(t*1.5+ph[4])};
+  }
+}
+
+/* ---------- drawing ---------- */
+const E=(x,y,rx,ry,f,s,lw=3)=>{ctx.beginPath();ctx.ellipse(x,y,Math.abs(rx),Math.abs(ry),0,0,7);if(f){ctx.fillStyle=f;ctx.fill()}if(s){ctx.lineWidth=lw;ctx.strokeStyle=s;ctx.stroke()}};
+const P=(pts,f,s)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();if(f){ctx.fillStyle=f;ctx.fill()}if(s){ctx.lineWidth=3;ctx.strokeStyle=s;ctx.stroke()}};
+const limb=(pts,w,c)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.lineWidth=w;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=c;ctx.stroke()};
+const line=(pts,c,w)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.lineWidth=w;ctx.lineCap='round';ctx.strokeStyle=c;ctx.stroke()};
+function drawChar(c,x,st){
+  const s=H*.98/760;ctx.save();ctx.translate(x-260*s,H-760*s+26);ctx.scale(s,s);
+  ctx.translate(0,(2*st.breath+st.nod*.4)/2);
+  limb([[115,500],[95,640],[105,745]],70,c.shirt);E(105,758,30,30,c.skin);
+  ctx.fillStyle=c.shade;ctx.fillRect(232,380,56,90);
+  P([[95,490],[150,455],[260,475],[370,455],[425,490],[450,760],[70,760]],c.shirt,OUT);
+  ctx.beginPath();ctx.arc(260,470,45,.35,2.8);ctx.lineWidth=3;ctx.strokeStyle=OUT;ctx.stroke();
+  const g=st.gest,u=[[470-40*st.gs,590],[400-60*st.gs,470+30*st.gs]],r=[[425,640],[415,745]];
+  const pts=[[405,500],...r.map((p,i)=>[p[0]+(u[i][0]-p[0])*g,p[1]+(u[i][1]-p[1])*g])];
+  limb(pts,70,c.shirt);E(pts[2][0],pts[2][1]+8,32,32,c.skin);
+  ctx.save();ctx.translate(260,450);ctx.rotate(st.tilt*Math.PI/180);ctx.translate(-260,-450+st.nod*.4);
+  head(c,st);ctx.restore();ctx.restore();
+}
+function head(c,st){
+  const cx=260,cy=292;
+  if(c.style==='long'){ctx.beginPath();ctx.roundRect(105,160,310,400,120);ctx.fillStyle=c.hair;ctx.fill();ctx.lineWidth=3;ctx.strokeStyle=OUT;ctx.stroke()}
+  E(cx,cy+5,135,145,c.skin,OUT);E(cx-138,cy+20,13,30,c.skin,OUT);E(cx+138,cy+20,13,30,c.skin,OUT);
+  ctx.beginPath();ctx.ellipse(cx,cy-57,150,117,0,Math.PI,2*Math.PI);ctx.closePath();ctx.fillStyle=c.hair;ctx.fill();ctx.lineWidth=3;ctx.strokeStyle=OUT;ctx.stroke();
+  P([[cx-140,cy-60],[cx-60,cy-20],[cx-20,cy-95],[cx+20,cy-25],[cx+70,cy-90],[cx+140,cy-60],[cx+100,cy-140],[cx-100,cy-140]],c.hair);
+  const lk=st.look*7;
+  for(const ex of[cx-62,cx+62]){
+    if(st.blink>.85){ctx.beginPath();ctx.arc(ex,cy+18,30,.2,2.9);ctx.lineWidth=4;ctx.strokeStyle=OUT;ctx.stroke()}
+    else{const ry=38*(1-.85*st.blink);E(ex,cy+20,30,ry,'#fff',OUT);E(ex+lk,cy+22,19,ry*.72,'#342830');E(ex+lk-2,cy+20-ry*.35,6,7,'#fff')}
+  }
+  const by=cy-30-12*st.brow;
+  for(const ex of[cx-62,cx+62])line([[ex-28,by+5],[ex,by-4],[ex+28,by+6]],c.style==='long'?OUT:c.hair,6);
+  E(cx-85,cy+75,24,13,'rgba(240,150,150,.45)');E(cx+85,cy+75,24,13,'rgba(240,150,150,.45)');
+  line([[cx,cy+62],[cx-5,cy+78],[cx+3,cy+80]],OUT,3);
+  const m=st.mouth,my=cy+108;
+  if(m<.07){ctx.beginPath();ctx.arc(cx,my-6,22,.3,2.85);ctx.lineWidth=4;ctx.strokeStyle=OUT;ctx.stroke()}
+  else{const rx=14+12*m,ry=4+32*m;E(cx,my+ry*.3,rx,ry*.7,'#782a34',OUT);if(m>.4)E(cx,my+ry*.65,rx*.6,ry*.3,'#eb7882')}
+}
+
+/* ---------- backgrounds (drawn live, slow camera drift) ---------- */
+function themeOf(bg){
+  const b=(bg||'').toLowerCase(),h=[...b].reduce((a,ch)=>(a*31+ch.charCodeAt(0))%360,0);
+  return{night:/night|moon|star|dark|midnight/.test(b),forest:/forest|tree|wood|jungle|garden/.test(b),sea:/sea|ocean|beach|lake|river|water/.test(b),
+    dawn:/dawn|morning|sunrise|sun|village|town|city|day/.test(b),hue:h};
+}
+function drawBG(th,t){
+  const g=ctx.createLinearGradient(0,0,0,H);
+  if(th.night){g.addColorStop(0,'#0e1030');g.addColorStop(1,'#34336b')}
+  else if(th.dawn){g.addColorStop(0,'#ffb88c');g.addColorStop(1,'#ffe9c2')}
+  else{g.addColorStop(0,`hsl(${th.hue},55%,72%)`);g.addColorStop(1,`hsl(${(th.hue+30)%360},60%,88%)`)}
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const dx=Math.sin(t*.12)*26;
+  if(th.night){ctx.fillStyle='#fff';for(let i=0;i<60;i++){const x=(i*137.5)%W,y=(i*71.3)%(H*.6);ctx.globalAlpha=.4+.6*Math.abs(Math.sin(t*.8+i));ctx.fillRect(x+dx*.2,y,2,2)}ctx.globalAlpha=1;
+    E(780+dx*.4,110,46,46,'#fff6d8');E(764+dx*.4,100,40,40,'#0e1030')}
+  else if(th.dawn){E(200+dx*.4,330,70,70,'#fff1b8');ctx.globalAlpha=.35;E(200+dx*.4,330,110,110,'#fff1b8');ctx.globalAlpha=1}
+  if(th.sea){ctx.fillStyle=th.night?'#1b2a5a':'#3d7fc4';ctx.fillRect(0,H*.62,W,H);ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=3;
+    for(let r=0;r<4;r++){ctx.beginPath();for(let x=0;x<=W;x+=12)ctx.lineTo(x,H*.68+r*28+Math.sin(x*.03+t*1.2+r)*5);ctx.stroke()}}
+  else{ctx.fillStyle=th.night?'#1c2a4a':th.dawn?'#9fcf8a':'#7dbd8c';
+    ctx.beginPath();ctx.moveTo(0,H);for(let x=0;x<=W;x+=20)ctx.lineTo(x+dx*.6,H*.66+Math.sin(x*.006)*34);ctx.lineTo(W,H);ctx.fill()}
+  if(th.forest){ctx.fillStyle=th.night?'#0f2a2e':'#2f7a4a';
+    for(let i=0;i<9;i++){const x=i*125+dx*.9-30,h=210+(i%3)*60;P([[x,H*.78],[x+55,H*.78-h],[x+110,H*.78]],ctx.fillStyle)}}
+}
+
+/* ---------- performance ---------- */
+let rigs={},play=null,voices=[],paused=false;
+function loadVoices(){
+  voices=speechSynthesis.getVoices();const sel=$('#voice');sel.innerHTML='';
+  const en=voices.map((v,i)=>({v,i})).sort((a,b)=>(b.v.lang.startsWith('en'))-(a.v.lang.startsWith('en')));
+  en.forEach(({v,i})=>{const o=document.createElement('option');o.value=i;o.textContent=`${v.name} (${v.lang})`;sel.appendChild(o)});
+}
+if('speechSynthesis' in window){loadVoices();speechSynthesis.onvoiceschanged=loadVoices}
+else $('#st').textContent='This browser can’t speak aloud';
+
+function start(){
+  speechSynthesis.cancel();
+  const {st,queue}=parse($('#script').value);
+  if(!queue.length){$('#st').textContent='Add some story text first';return}
+  rigs={};Object.keys(st.chars).forEach((n,i)=>rigs[n]=new Rig(i+1));
+  play={st,queue,i:-1,cur:null,wp:0,lastB:0,th:null,scene:-1,t0:performance.now()};
+  $('#go').textContent='Start over';$('#pause').disabled=false;paused=false;$('#pause').textContent='Pause';
+  next();
+}
+function next(){
+  if(!play)return;play.i++;
+  if(play.i>=play.queue.length){play.cur=null;$('#st').textContent='The end';$('#cap').style.display='none';return}
+  const q=play.queue[play.i];play.cur=q;
+  if(q.scene!==play.scene){play.scene=q.scene;play.th=themeOf(play.st.scenes[q.scene].bg)}
+  const u=new SpeechSynthesisUtterance(q.text),v=voices[+$('#voice').value];
+  if(v){u.voice=v;u.lang=v.lang}
+  const ci=play.st.chars[q.sp].idx;u.pitch=[1,1.35,.8,1.15][ci%4];u.rate=.95;
+  u.onboundary=()=>{play.wp=1;play.lastB=performance.now()};
+  const done=()=>{if(play&&play.cur===q){play.cur=null;setTimeout(()=>{if(play&&!paused)next();else if(play)play.pendingNext=true},320)}};
+  u.onend=done;u.onerror=done;
+  $('#cap').textContent=q.text;$('#cap').style.display='block';
+  $('#st').textContent=`Line ${play.i+1} of ${play.queue.length}`;
+  speechSynthesis.speak(u);
+}
+$('#go').onclick=start;
+$('#pause').onclick=()=>{
+  if(!play)return;paused=!paused;$('#pause').textContent=paused?'Resume':'Pause';
+  if(paused)speechSynthesis.pause();else{speechSynthesis.resume();if(play.pendingNext){play.pendingNext=false;next()}}
+};
+
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;const t=now/1000;
+  if(!play){drawBG({night:true,forest:true,hue:250},t);
+    if(!window._idle){window._idle={c:Object.assign({idx:0,style:'short',shade:shade(PAL[0].skin)},PAL[0]),r:new Rig(1)}}
+    drawChar(window._idle.c,W*.5,window._idle.r.update(dt,0,false))}
+  else{
+    drawBG(play.th||themeOf(''),t);
+    const sc=play.st.scenes[Math.max(0,play.scene)],cur=play.cur;
+    if(cur&&!paused){
+      const age=now-play.lastB;
+      if(age>340){play.wp=.55+Math.random()*.45;play.lastB=now}
+    }
+    play.wp*=Math.exp(-dt*7);
+    const syl=Math.abs(Math.sin(t*14));
+    const env=(cur&&!paused)?Math.min(1,.12+.25*syl+.75*play.wp*(.6+.4*syl)):0;
+    const n=sc.cast.length;
+    sc.cast.forEach((name,i)=>{
+      const sp=cur&&cur.sp===name&&!paused;
+      drawChar(play.st.chars[name],W*(i+1)/(n+1),rigs[name].update(paused?0:dt,sp?env:0,sp));
+    });
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
