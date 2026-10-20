@@ -25,7 +25,7 @@ Once upon a time...            <- unnamed lines are read by the off-screen Narra
 Mia: "You can't catch the moon!"
 ```
 
-Words like night, forest, sea, village or dawn in a `[bg: ...]` line change the setting.
+Use `[bg: moonlit forest]` to set a scene. Add another `[bg: sea at dawn]` or `[bg: village]` line when the location changes. Narration action words such as *walked, ran, jumped, fell, laughed, gasped, pointed,* and *wondered* trigger animated movement automatically.
 
 Voices: af_heart, af_bella, af_nicole, af_sarah, bf_emma, am_michael, am_fenrir, am_puck, bm_george, bm_fable.
 
@@ -33,3 +33,7 @@ Voices: af_heart, af_bella, af_nicole, af_sarah, bf_emma, am_michael, am_fenrir,
 
 - Voicing runs on your device, so it is slower on phones. The page can freeze briefly while a line is generated.
 - Recording happens in real time and needs the tab to stay open and visible.
+
+## Storytime motion cues
+
+Characters no longer need to remain planted in place. The animation reads each narration line for common physical actions and adds free, real-time movement: walking and running travel across the scene, jumps arc upward, falls dip, laughter bounces, and surprise/pointing/thinking add small acting motions. These cues are heuristic, so write clear action verbs in the narration for the best results. No paid API or remote video-generation service is used.

@@ -174,8 +174,8 @@ const E=(x,y,rx,ry,f,s,lw=3)=>{ctx.beginPath();ctx.ellipse(x,y,Math.abs(rx),Math
 const P=(pts,f,s)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();if(f){ctx.fillStyle=f;ctx.fill()}if(s){ctx.lineWidth=3;ctx.strokeStyle=s;ctx.stroke()}};
 const limb=(pts,w,c)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.lineWidth=w;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=c;ctx.stroke()};
 const line=(pts,c,w)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.lineWidth=w;ctx.lineCap='round';ctx.strokeStyle=c;ctx.stroke()};
-function drawChar(c,x,st){
-  const s=H*.98/760;ctx.save();ctx.translate(x-260*s,H-760*s+26);ctx.scale(s,s);
+function drawChar(c,x,st,motion={}){
+  const s=H*.98/760;ctx.save();ctx.translate(x-260*s,H-760*s+26-(motion.lift||0));ctx.scale(s,s);
   ctx.translate(0,(2*st.breath+st.nod*.4)/2);
   limb([[115,500],[95,640],[105,745]],70,c.shirt);E(105,758,30,30,c.skin);
   ctx.fillStyle=c.shade;ctx.fillRect(232,380,56,90);
@@ -280,6 +280,31 @@ async function prepare(){
   return cache;
 }
 
+/* ---------- story-driven physical acting ---------- */
+function actionFor(text){
+  const t=(text||'').toLowerCase();
+  if(/\b(ran|running|sprinted|sprint|rushed|dash|dashed|chased|chasing)\b/.test(t))return 'run';
+  if(/\b(walked|walking|strolled|wandered|approached|left|followed|stepped|tiptoed|headed)\b/.test(t))return 'walk';
+  if(/\b(jumped|leapt|leaped|hopped|jumping|flew|floating)\b/.test(t))return 'jump';
+  if(/\b(fell|tripped|slipped|collapsed|stumbled|crashed)\b/.test(t))return 'fall';
+  if(/\b(laughed|giggle|giggled|chuckled|hilarious|funny)\b/.test(t))return 'laugh';
+  if(/\b(shocked|surprised|gasped|suddenly|astonished|couldn.t believe)\b/.test(t))return 'surprise';
+  if(/\b(pointed|pointing|showed|look over there|looked at)\b/.test(t))return 'point';
+  if(/\b(thought|wondered|remembered|pondered|considered)\b/.test(t))return 'think';
+  return 'idle';
+}
+function actionMotion(action,progress,time,index){
+  const p=Math.max(0,Math.min(1,progress)),phase=time*9+index*1.7;
+  if(action==='run')return {x:(p-.5)*150+Math.sin(phase)*9,lift:Math.abs(Math.sin(phase))*24};
+  if(action==='walk')return {x:(p-.5)*100+Math.sin(phase)*5,lift:Math.abs(Math.sin(phase))*7};
+  if(action==='jump')return {x:Math.sin(p*Math.PI)*18,lift:Math.sin(p*Math.PI)*92};
+  if(action==='fall')return {x:Math.sin(p*Math.PI)*22,lift:-Math.sin(p*Math.PI)*10};
+  if(action==='laugh')return {x:Math.sin(phase*1.7)*4,lift:Math.abs(Math.sin(phase*1.7))*13};
+  if(action==='surprise')return {x:Math.sin(phase)*3,lift:Math.abs(Math.sin(phase))*8};
+  if(action==='point'||action==='think')return {x:Math.sin(time*1.4+index)*2,lift:0};
+  return {x:Math.sin(time*1.2+index)*2,lift:Math.abs(Math.sin(phase*.45))*3};
+}
+
 /* ---------- playback + recording ---------- */
 let rigs={},play=null,paused=false,rec=null,chunks=[];
 function stopPlay(){
@@ -345,9 +370,12 @@ function frame(now){
     analyser.getFloatTimeDomainData(buf);let s=0;for(let i=0;i<buf.length;i++)s+=buf[i]*buf[i];
     const env=speaking&&!paused?Math.min(1,Math.pow(Math.sqrt(s/buf.length)*6,.8)):0;
     const cast=c.st.scenes[it.scene].cast,n=cast.length;
+    const action=actionFor(it.text),progress=(tt-it.start)/Math.max(.1,it.dur);
     cast.forEach((name,i)=>{
       const sp=speaking&&it.sp===name;
-      drawChar(c.st.chars[name],W*(i+1)/(n+1),rigs[name].update(paused?0:dt,sp?env:0,sp));
+      const motion=actionMotion(action,progress,t,i);
+      const x=W*(i+1)/(n+1)+motion.x;
+      drawChar(c.st.chars[name],x,rigs[name].update(paused?0:dt,sp?env:0,sp),motion);
     });
     if(tt>=0)caption(it.text);
     if(tt>c.total&&!play.done){play.done=true;const f=play.onend;if(f)f()}
