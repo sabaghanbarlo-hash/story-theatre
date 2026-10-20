@@ -111,6 +111,27 @@ const PAL = [{skin:'#f6d3b6',hair:'#2a2030',shirt:'#2a9d8f'},{skin:'#e9b998',hai
 const CHAR_VOICES = ['am_michael','af_bella','bf_emma','am_puck','af_nicole','bm_george'];
 const NARR = 'Narrator';
 function shade(h){const n=parseInt(h.slice(1),16);return '#'+[(n>>16)&255,(n>>8)&255,n&255].map(v=>Math.round(v*.88).toString(16).padStart(2,'0')).join('')}
+function inferLocation(text){
+  const t=(text||'').toLowerCase();
+  const rules=[
+    [/\b(cafeteria|lunchroom)\b/,'school cafeteria'],
+    [/\b(classroom|school|teacher|lesson|homework|hallway|locker|college|campus)\b/,'school hallway'],
+    [/\b(bedroom|bed|pillow|woke up|waking up|alarm clock|closet)\b/,'cozy bedroom'],
+    [/\b(kitchen|fridge|refrigerator|oven|stove|cooking|breakfast|dinner|sink)\b/,'busy kitchen'],
+    [/\b(office|meeting|boss|coworker|desk job|workplace)\b/,'office'],
+    [/\b(beach|ocean|sea|waves|sand|shore)\b/,'sunny beach'],
+    [/\b(forest|woods|trees|jungle|campfire)\b/,'enchanted forest'],
+    [/\b(park|playground|swing|picnic|garden)\b/,'city park'],
+    [/\b(bus|bus stop|train|subway|station|commute|traffic|street|sidewalk|crosswalk)\b/,'busy city street'],
+    [/\b(store|shop|mall|supermarket|checkout|cashier)\b/,'shop interior'],
+    [/\b(restaurant|cafe|coffee shop|waiter|menu)\b/,'cozy cafe'],
+    [/\b(hospital|doctor|nurse|clinic)\b/,'hospital room'],
+    [/\b(home|living room|sofa|couch|front door|apartment)\b/,'living room']
+  ];
+  for(const [re,scene] of rules)if(re.test(t))return scene;
+  return null;
+}
+
 function parse(t, narratorVoice){
   const st={chars:{},scenes:[]};let sc=null;
   for(const raw of t.split('\n')){
@@ -122,7 +143,12 @@ function parse(t, narratorVoice){
     }
     let m=l.match(/^\[bg:\s*(.*)\]$/i);
     if(m){sc={bg:m[1],lines:[]};st.scenes.push(sc);continue}
-    if(!sc){sc={bg:'',lines:[]};st.scenes.push(sc)}
+    // Infer visual locations from plain scripts, not only special [bg: ...] markup.
+    const inferred=inferLocation(l);
+    if(!sc){sc={bg:inferred||'city park',lines:[]};st.scenes.push(sc)}
+    else if(inferred && inferred!==sc.bg){
+      sc={bg:inferred,lines:[]};st.scenes.push(sc);
+    }
     m=l.match(/^([^:]{1,20}):\s*(.+)$/);
     let sp=null,body=l;
     if(m&&(st.chars[m[1].trim()]||m[1].trim()===NARR)){sp=m[1].trim();body=m[2]}
@@ -174,14 +200,29 @@ const E=(x,y,rx,ry,f,s,lw=3)=>{ctx.beginPath();ctx.ellipse(x,y,Math.abs(rx),Math
 const P=(pts,f,s)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();if(f){ctx.fillStyle=f;ctx.fill()}if(s){ctx.lineWidth=3;ctx.strokeStyle=s;ctx.stroke()}};
 const limb=(pts,w,c)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.lineWidth=w;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=c;ctx.stroke()};
 const line=(pts,c,w)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.lineWidth=w;ctx.lineCap='round';ctx.strokeStyle=c;ctx.stroke()};
-function drawChar(c,x,st){
-  const s=H*.98/760;ctx.save();ctx.translate(x-260*s,H-760*s+26);ctx.scale(s,s);
+function drawChar(c,x,st,motion={}){
+  const s=H*.98/760;ctx.save();ctx.translate(x-260*s,H-760*s+26-(motion.lift||0));ctx.scale(s,s);
   ctx.translate(0,(2*st.breath+st.nod*.4)/2);
-  limb([[115,500],[95,640],[105,745]],70,c.shirt);E(105,758,30,30,c.skin);
+  const p=motion.progress==null?.5:motion.progress;
+  if(motion.action==='fall'){ctx.translate(260,500);ctx.rotate(Math.sin(p*Math.PI)*.42);ctx.translate(-260,-500)}
+  const stride=motion.action==='walk'||motion.action==='run'?Math.sin(motion.phase||0)*(motion.action==='run'?62:34):motion.action==='jump'?Math.sin(motion.phase||0)*22:0;
+  limb([[180,690],[170+stride,735],[160+stride,780]],48,c.shirt);E(160+stride,785,27,22,c.skin);
+  limb([[340,690],[350-stride,735],[360-stride,780]],48,c.shirt);E(360-stride,785,27,22,c.skin);
+  const leftArm=['cheer','wave'].includes(motion.action)?[[115,500],[65,435],[82,355]]:motion.action==='cry'?[[115,500],[92,575],[118,620]]:motion.action==='angry'?[[115,500],[82,565],[95,625]]:[[115,500],[95,640],[105,745]];
+  limb(leftArm,70,c.shirt);E(leftArm[2][0],leftArm[2][1]+8,30,30,c.skin);
   ctx.fillStyle=c.shade;ctx.fillRect(232,380,56,90);
   P([[95,490],[150,455],[260,475],[370,455],[425,490],[450,760],[70,760]],c.shirt,OUT);
   ctx.beginPath();ctx.arc(260,470,45,.35,2.8);ctx.lineWidth=3;ctx.strokeStyle=OUT;ctx.stroke();
-  const g=st.gest,u=[[470-40*st.gs,590],[400-60*st.gs,470+30*st.gs]],r=[[425,640],[415,745]];
+  const armSwing=motion.action==='walk'||motion.action==='run'?Math.sin(motion.phase||0)*(motion.action==='run'?95:48):0;
+  let g=st.gest,u=[[470-40*st.gs+armSwing,590-(motion.action==='jump'?70:0)],[400-60*st.gs+armSwing,470+30*st.gs-(motion.action==='jump'?100:0)]];
+  if(motion.action==='point'){g=Math.max(g,.92);u=[[485,455],[525,385]]}
+  if(motion.action==='think'){g=Math.max(g,.7);u=[[465,465],[405,365]]}
+  if(motion.action==='wave'){g=Math.max(g,.98);u=[[485,440],[435,320+Math.sin(motion.phase||0)*20]]}
+  if(motion.action==='cheer'){g=Math.max(g,.98);u=[[485,425],[445,300]]}
+  if(motion.action==='cry'){g=Math.max(g,.85);u=[[455,480],[390,350]]}
+  if(motion.action==='angry'){g=Math.max(g,.9);u=[[485,560],[430,515]]}
+  if(motion.action==='shrug'){g=Math.max(g,.85);u=[[485,520],[450,500]]}
+  const r=[[425,640],[415,745]];
   const pts=[[405,500],...r.map((p,i)=>[p[0]+(u[i][0]-p[0])*g,p[1]+(u[i][1]-p[1])*g])];
   limb(pts,70,c.shirt);E(pts[2][0],pts[2][1]+8,32,32,c.skin);
   ctx.save();ctx.translate(260,450);ctx.rotate(st.tilt*Math.PI/180);ctx.translate(-260,-450+st.nod*.4);
@@ -221,7 +262,8 @@ function caption(text){
 function themeOf(bg){
   const b=(bg||'').toLowerCase(),h=[...b].reduce((a,ch)=>(a*31+ch.charCodeAt(0))%360,0);
   return{night:/night|moon|star|dark|midnight/.test(b),forest:/forest|tree|wood|jungle|garden/.test(b),sea:/sea|ocean|beach|lake|river|water/.test(b),
-    dawn:/dawn|morning|sunrise|sun|village|town|city|day/.test(b),hue:h};
+    dawn:/dawn|morning|sunrise|sun|village|town|city|day|school|bedroom|kitchen|office|shop|cafe|hospital|living room/.test(b),
+    room:/bedroom|kitchen|office|shop|cafe|hospital|living room|school/.test(b),school:/school|classroom|college|campus/.test(b),bedroom:/bedroom/.test(b),kitchen:/kitchen/.test(b),office:/office/.test(b),city:/city|street|station|bus|town/.test(b),park:/park|garden/.test(b),beach:/beach/.test(b),hue:h};
 }
 function drawBG(th,t){
   const g=ctx.createLinearGradient(0,0,0,H);
@@ -239,6 +281,16 @@ function drawBG(th,t){
     ctx.beginPath();ctx.moveTo(0,H);for(let x=0;x<=W;x+=20)ctx.lineTo(x+dx*.6,H*.66+Math.sin(x*.006)*34);ctx.lineTo(W,H);ctx.fill()}
   if(th.forest){ctx.fillStyle=th.night?'#0f2a2e':'#2f7a4a';
     for(let i=0;i<9;i++){const x=i*125+dx*.9-30,h=210+(i%3)*60;P([[x,H*.78],[x+55,H*.78-h],[x+110,H*.78]],ctx.fillStyle)}}
+  // Distinct, hand-drawn scene dressing so inferred locations visibly differ.
+  if(th.room){ctx.fillStyle=th.bedroom?'#e9d9ff':th.kitchen?'#d8edf2':th.school?'#d8e7ff':th.office?'#e5e0f2':'#f5e4d1';ctx.fillRect(0,H*.12,W,H*.62);ctx.fillStyle='#fff8e8';ctx.fillRect(W*.08,H*.2,W*.22,H*.25);ctx.strokeStyle='#9b806c';ctx.lineWidth=8;ctx.strokeRect(W*.08,H*.2,W*.22,H*.25);ctx.beginPath();ctx.moveTo(W*.19,H*.2);ctx.lineTo(W*.19,H*.45);ctx.moveTo(W*.08,H*.325);ctx.lineTo(W*.3,H*.325);ctx.stroke();
+    ctx.fillStyle=th.kitchen?'#6d9caa':'#b88461';ctx.fillRect(W*.62,H*.48,W*.29,H*.13);ctx.fillRect(W*.65,H*.61,W*.035,H*.17);ctx.fillRect(W*.85,H*.61,W*.035,H*.17);
+    if(th.bedroom){ctx.fillStyle='#8d83c7';ctx.fillRect(W*.1,H*.53,W*.3,H*.17);ctx.fillStyle='#f6f0ff';ctx.fillRect(W*.12,H*.53,W*.1,H*.07)}
+    if(th.school){ctx.fillStyle='#426e82';ctx.fillRect(W*.37,H*.23,W*.26,H*.12);ctx.fillStyle='#fff';ctx.font='bold 18px sans-serif';ctx.fillText('TODAY',W*.5,H*.29)}
+    if(th.kitchen){ctx.fillStyle='#d6a24e';ctx.fillRect(W*.7,H*.43,W*.09,H*.05);ctx.fillStyle='#f5f1dc';ctx.fillRect(W*.74,H*.4,W*.035,H*.04)}
+  }
+  if(th.city){ctx.fillStyle='#7385a5';for(let i=0;i<7;i++){const x=i*W/6;const bh=H*(.18+(i%3)*.08);ctx.fillRect(x,H*.62-bh,W*.105,bh);ctx.fillStyle='#f9d995';for(let wy=H*.65-bh;wy<H*.6;wy+=22)for(let wx=x+10;wx<x+W*.09;wx+=20)ctx.fillRect(wx,wy,7,9);ctx.fillStyle='#7385a5'}ctx.fillStyle='#4b4b5b';ctx.fillRect(0,H*.78,W,H*.08);ctx.strokeStyle='#fff';ctx.setLineDash([22,18]);ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(0,H*.82);ctx.lineTo(W,H*.82);ctx.stroke();ctx.setLineDash([])}
+  if(th.beach){ctx.fillStyle='#f1d39a';ctx.fillRect(0,H*.75,W,H*.25);E(W*.82,H*.2,48,48,'#fff1ad')}
+  if(th.park){ctx.fillStyle='#478f56';for(let i=0;i<5;i++){const x=70+i*190;ctx.fillRect(x,H*.49,12,H*.23);E(x+6,H*.43,47,54,'#368052')}}
 }
 
 /* ---------- free AI narrator (Kokoro, runs in your browser) ---------- */
@@ -278,6 +330,49 @@ async function prepare(){
   }
   cache={key,items,st,total:start};
   return cache;
+}
+
+/* ---------- story-driven physical acting ---------- */
+function actionFor(text){
+  const t=(text||'').toLowerCase();
+  if(/\b(ran|running|sprinted|sprint|rushed|dash|dashed|chased|chasing|bolted)\b/.test(t))return 'run';
+  if(/\b(walked|walking|strolled|wandered|approached|left|followed|stepped|tiptoed|headed|entered|exited)\b/.test(t))return 'walk';
+  if(/\b(jumped|leapt|leaped|hopped|jumping|flew|floating|bounced)\b/.test(t))return 'jump';
+  if(/\b(fell|tripped|slipped|collapsed|stumbled|crashed)\b/.test(t))return 'fall';
+  if(/\b(laughed|giggle|giggled|chuckled|snickered|hilarious|funny)\b/.test(t))return 'laugh';
+  if(/\b(crying|cried|sobbed|wept|tears|sniffled)\b/.test(t))return 'cry';
+  if(/\b(cheered|celebrated|hooray|rejoiced|won|victory|excitedly)\b/.test(t))return 'cheer';
+  if(/\b(waved|waving|said goodbye|waved goodbye|greeted)\b/.test(t))return 'wave';
+  if(/\b(angry|furious|snapped|shouted angrily|stomped|annoyed)\b/.test(t))return 'angry';
+  if(/\b(shrugged|shrug|whatever|didn't know|did not know)\b/.test(t))return 'shrug';
+  if(/\b(shocked|surprised|gasped|suddenly|astonished|couldn.t believe|stared in disbelief)\b/.test(t))return 'surprise';
+  if(/\b(pointed|pointing|showed|look over there|looked at)\b/.test(t))return 'point';
+  if(/\b(thought|wondered|remembered|pondered|considered|confused|puzzled)\b/.test(t))return 'think';
+  return 'idle';
+}
+function reactionFor(action){
+  if(['run','walk','jump','fall','surprise','angry'].includes(action))return 'surprise';
+  if(action==='laugh'||action==='cheer')return 'laugh';
+  if(action==='point'||action==='think')return 'think';
+  return 'idle';
+}
+function actionMotion(action,progress,time,index){
+  const p=Math.max(0,Math.min(1,progress)),phase=time*9+index*1.7;
+  if(action==='run')return {action,phase,x:(p-.5)*210+Math.sin(phase)*12,lift:Math.abs(Math.sin(phase))*30,progress:p};
+  if(action==='walk')return {action,phase,x:(p-.5)*140+Math.sin(phase)*6,lift:Math.abs(Math.sin(phase))*8,progress:p};
+  if(action==='jump')return {action,phase,x:Math.sin(p*Math.PI)*20,lift:Math.sin(p*Math.PI)*105,progress:p};
+  if(action==='fall')return {action,phase,x:Math.sin(p*Math.PI)*28,lift:0,progress:p};
+  if(action==='laugh')return {action,phase,x:Math.sin(phase*1.7)*5,lift:Math.abs(Math.sin(phase*1.7))*16,progress:p};
+  if(action==='surprise')return {action,phase,x:Math.sin(phase)*3,lift:Math.abs(Math.sin(phase))*8,progress:p};
+  if(action==='point'||action==='think'||action==='wave'||action==='cheer'||action==='cry'||action==='angry'||action==='shrug')return {action,phase,x:Math.sin(time*1.4+index)*2,lift:action==='cry'?Math.abs(Math.sin(phase*.6))*3:0,progress:p};
+  return {action:'idle',phase,x:Math.sin(time*1.2+index)*2,lift:Math.abs(Math.sin(phase*.45))*3,progress:p};
+}
+function cameraFor(action,progress,actorX){
+  const p=Math.max(0,Math.min(1,progress));
+  const zoom=action==='surprise'?1.075:action==='jump'||action==='fall'?1.055:action==='think'||action==='cry'?1.035:action==='run'?1.045:1.015;
+  const pan=Math.max(-95,Math.min(95,(W*.5-actorX)*.17));
+  const pulse=action==='surprise'?Math.sin(p*Math.PI)*.012:action==='jump'?Math.sin(p*Math.PI)*.018:0;
+  return {zoom:zoom+pulse,x:pan,y:action==='jump'?-Math.sin(p*Math.PI)*9:0};
 }
 
 /* ---------- playback + recording ---------- */
@@ -341,14 +436,24 @@ function frame(now){
     let idx=0;for(let i=0;i<c.items.length;i++){if(c.items[i].start<=tt)idx=i}
     const it=c.items[idx],speaking=tt>=it.start&&tt<it.start+it.dur;
     if(it.scene!==play.scene){play.scene=it.scene;play.th=themeOf(c.st.scenes[it.scene].bg)}
-    drawBG(play.th,t);
     analyser.getFloatTimeDomainData(buf);let s=0;for(let i=0;i<buf.length;i++)s+=buf[i]*buf[i];
     const env=speaking&&!paused?Math.min(1,Math.pow(Math.sqrt(s/buf.length)*6,.8)):0;
     const cast=c.st.scenes[it.scene].cast,n=cast.length;
+    const action=actionFor(it.text),progress=(tt-it.start)/Math.max(.1,it.dur);
+    const activeName=it.sp===NARR?cast[0]:it.sp;
+    const activeIndex=Math.max(0,cast.indexOf(activeName));
+    const actorX=W*(activeIndex+1)/(n+1)+actionMotion(action,progress,t,activeIndex).x;
+    const camera=cameraFor(action,progress,actorX);
+    ctx.save();ctx.translate(W/2,H/2);ctx.scale(camera.zoom,camera.zoom);ctx.translate(-W/2+camera.x,-H/2+camera.y);
+    drawBG(play.th,t);
     cast.forEach((name,i)=>{
       const sp=speaking&&it.sp===name;
-      drawChar(c.st.chars[name],W*(i+1)/(n+1),rigs[name].update(paused?0:dt,sp?env:0,sp));
+      const charAction=name===activeName?action:reactionFor(action);
+      const motion=actionMotion(charAction,progress,t,i);
+      const x=W*(i+1)/(n+1)+motion.x;
+      drawChar(c.st.chars[name],x,rigs[name].update(paused?0:dt,sp?env:0,sp),motion);
     });
+    ctx.restore();
     if(tt>=0)caption(it.text);
     if(tt>c.total&&!play.done){play.done=true;const f=play.onend;if(f)f()}
   }
