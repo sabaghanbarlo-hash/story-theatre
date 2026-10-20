@@ -203,15 +203,26 @@ const line=(pts,c,w)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]
 function drawChar(c,x,st,motion={}){
   const s=H*.98/760;ctx.save();ctx.translate(x-260*s,H-760*s+26-(motion.lift||0));ctx.scale(s,s);
   ctx.translate(0,(2*st.breath+st.nod*.4)/2);
+  const p=motion.progress==null?.5:motion.progress;
+  if(motion.action==='fall'){ctx.translate(260,500);ctx.rotate(Math.sin(p*Math.PI)*.42);ctx.translate(-260,-500)}
   const stride=motion.action==='walk'||motion.action==='run'?Math.sin(motion.phase||0)*(motion.action==='run'?62:34):motion.action==='jump'?Math.sin(motion.phase||0)*22:0;
   limb([[180,690],[170+stride,735],[160+stride,780]],48,c.shirt);E(160+stride,785,27,22,c.skin);
   limb([[340,690],[350-stride,735],[360-stride,780]],48,c.shirt);E(360-stride,785,27,22,c.skin);
-  limb([[115,500],[95,640],[105,745]],70,c.shirt);E(105,758,30,30,c.skin);
+  const leftArm=['cheer','wave'].includes(motion.action)?[[115,500],[65,435],[82,355]]:motion.action==='cry'?[[115,500],[92,575],[118,620]]:motion.action==='angry'?[[115,500],[82,565],[95,625]]:[[115,500],[95,640],[105,745]];
+  limb(leftArm,70,c.shirt);E(leftArm[2][0],leftArm[2][1]+8,30,30,c.skin);
   ctx.fillStyle=c.shade;ctx.fillRect(232,380,56,90);
   P([[95,490],[150,455],[260,475],[370,455],[425,490],[450,760],[70,760]],c.shirt,OUT);
   ctx.beginPath();ctx.arc(260,470,45,.35,2.8);ctx.lineWidth=3;ctx.strokeStyle=OUT;ctx.stroke();
-  const g=st.gest,armSwing=motion.action==='walk'||motion.action==='run'?Math.sin(motion.phase||0)*(motion.action==='run'?95:48):0;
-  const u=[[470-40*st.gs+armSwing,590-(motion.action==='jump'?70:0)],[400-60*st.gs+armSwing,470+30*st.gs-(motion.action==='jump'?100:0)]],r=[[425,640],[415,745]];
+  const armSwing=motion.action==='walk'||motion.action==='run'?Math.sin(motion.phase||0)*(motion.action==='run'?95:48):0;
+  let g=st.gest,u=[[470-40*st.gs+armSwing,590-(motion.action==='jump'?70:0)],[400-60*st.gs+armSwing,470+30*st.gs-(motion.action==='jump'?100:0)]];
+  if(motion.action==='point'){g=Math.max(g,.92);u=[[485,455],[525,385]]}
+  if(motion.action==='think'){g=Math.max(g,.7);u=[[465,465],[405,365]]}
+  if(motion.action==='wave'){g=Math.max(g,.98);u=[[485,440],[435,320+Math.sin(motion.phase||0)*20]]}
+  if(motion.action==='cheer'){g=Math.max(g,.98);u=[[485,425],[445,300]]}
+  if(motion.action==='cry'){g=Math.max(g,.85);u=[[455,480],[390,350]]}
+  if(motion.action==='angry'){g=Math.max(g,.9);u=[[485,560],[430,515]]}
+  if(motion.action==='shrug'){g=Math.max(g,.85);u=[[485,520],[450,500]]}
+  const r=[[425,640],[415,745]];
   const pts=[[405,500],...r.map((p,i)=>[p[0]+(u[i][0]-p[0])*g,p[1]+(u[i][1]-p[1])*g])];
   limb(pts,70,c.shirt);E(pts[2][0],pts[2][1]+8,32,32,c.skin);
   ctx.save();ctx.translate(260,450);ctx.rotate(st.tilt*Math.PI/180);ctx.translate(-260,-450+st.nod*.4);
@@ -324,26 +335,44 @@ async function prepare(){
 /* ---------- story-driven physical acting ---------- */
 function actionFor(text){
   const t=(text||'').toLowerCase();
-  if(/\b(ran|running|sprinted|sprint|rushed|dash|dashed|chased|chasing)\b/.test(t))return 'run';
-  if(/\b(walked|walking|strolled|wandered|approached|left|followed|stepped|tiptoed|headed)\b/.test(t))return 'walk';
-  if(/\b(jumped|leapt|leaped|hopped|jumping|flew|floating)\b/.test(t))return 'jump';
+  if(/\b(ran|running|sprinted|sprint|rushed|dash|dashed|chased|chasing|bolted)\b/.test(t))return 'run';
+  if(/\b(walked|walking|strolled|wandered|approached|left|followed|stepped|tiptoed|headed|entered|exited)\b/.test(t))return 'walk';
+  if(/\b(jumped|leapt|leaped|hopped|jumping|flew|floating|bounced)\b/.test(t))return 'jump';
   if(/\b(fell|tripped|slipped|collapsed|stumbled|crashed)\b/.test(t))return 'fall';
-  if(/\b(laughed|giggle|giggled|chuckled|hilarious|funny)\b/.test(t))return 'laugh';
-  if(/\b(shocked|surprised|gasped|suddenly|astonished|couldn.t believe)\b/.test(t))return 'surprise';
+  if(/\b(laughed|giggle|giggled|chuckled|snickered|hilarious|funny)\b/.test(t))return 'laugh';
+  if(/\b(crying|cried|sobbed|wept|tears|sniffled)\b/.test(t))return 'cry';
+  if(/\b(cheered|celebrated|hooray|rejoiced|won|victory|excitedly)\b/.test(t))return 'cheer';
+  if(/\b(waved|waving|said goodbye|waved goodbye|greeted)\b/.test(t))return 'wave';
+  if(/\b(angry|furious|snapped|shouted angrily|stomped|annoyed)\b/.test(t))return 'angry';
+  if(/\b(shrugged|shrug|whatever|didn't know|did not know)\b/.test(t))return 'shrug';
+  if(/\b(shocked|surprised|gasped|suddenly|astonished|couldn.t believe|stared in disbelief)\b/.test(t))return 'surprise';
   if(/\b(pointed|pointing|showed|look over there|looked at)\b/.test(t))return 'point';
-  if(/\b(thought|wondered|remembered|pondered|considered)\b/.test(t))return 'think';
+  if(/\b(thought|wondered|remembered|pondered|considered|confused|puzzled)\b/.test(t))return 'think';
+  return 'idle';
+}
+function reactionFor(action){
+  if(['run','walk','jump','fall','surprise','angry'].includes(action))return 'surprise';
+  if(action==='laugh'||action==='cheer')return 'laugh';
+  if(action==='point'||action==='think')return 'think';
   return 'idle';
 }
 function actionMotion(action,progress,time,index){
   const p=Math.max(0,Math.min(1,progress)),phase=time*9+index*1.7;
-  if(action==='run')return {action,phase,x:(p-.5)*150+Math.sin(phase)*9,lift:Math.abs(Math.sin(phase))*24};
-  if(action==='walk')return {action,phase,x:(p-.5)*100+Math.sin(phase)*5,lift:Math.abs(Math.sin(phase))*7};
-  if(action==='jump')return {action,phase,x:Math.sin(p*Math.PI)*18,lift:Math.sin(p*Math.PI)*92};
-  if(action==='fall')return {action,phase,x:Math.sin(p*Math.PI)*22,lift:-Math.sin(p*Math.PI)*10};
-  if(action==='laugh')return {action,phase,x:Math.sin(phase*1.7)*4,lift:Math.abs(Math.sin(phase*1.7))*13};
-  if(action==='surprise')return {action,phase,x:Math.sin(phase)*3,lift:Math.abs(Math.sin(phase))*8};
-  if(action==='point'||action==='think')return {action,phase,x:Math.sin(time*1.4+index)*2,lift:0};
-  return {action,phase,x:Math.sin(time*1.2+index)*2,lift:Math.abs(Math.sin(phase*.45))*3};
+  if(action==='run')return {action,phase,x:(p-.5)*210+Math.sin(phase)*12,lift:Math.abs(Math.sin(phase))*30,progress:p};
+  if(action==='walk')return {action,phase,x:(p-.5)*140+Math.sin(phase)*6,lift:Math.abs(Math.sin(phase))*8,progress:p};
+  if(action==='jump')return {action,phase,x:Math.sin(p*Math.PI)*20,lift:Math.sin(p*Math.PI)*105,progress:p};
+  if(action==='fall')return {action,phase,x:Math.sin(p*Math.PI)*28,lift:0,progress:p};
+  if(action==='laugh')return {action,phase,x:Math.sin(phase*1.7)*5,lift:Math.abs(Math.sin(phase*1.7))*16,progress:p};
+  if(action==='surprise')return {action,phase,x:Math.sin(phase)*3,lift:Math.abs(Math.sin(phase))*8,progress:p};
+  if(action==='point'||action==='think'||action==='wave'||action==='cheer'||action==='cry'||action==='angry'||action==='shrug')return {action,phase,x:Math.sin(time*1.4+index)*2,lift:action==='cry'?Math.abs(Math.sin(phase*.6))*3:0,progress:p};
+  return {action:'idle',phase,x:Math.sin(time*1.2+index)*2,lift:Math.abs(Math.sin(phase*.45))*3,progress:p};
+}
+function cameraFor(action,progress,actorX){
+  const p=Math.max(0,Math.min(1,progress));
+  const zoom=action==='surprise'?1.075:action==='jump'||action==='fall'?1.055:action==='think'||action==='cry'?1.035:action==='run'?1.045:1.015;
+  const pan=Math.max(-95,Math.min(95,(W*.5-actorX)*.17));
+  const pulse=action==='surprise'?Math.sin(p*Math.PI)*.012:action==='jump'?Math.sin(p*Math.PI)*.018:0;
+  return {zoom:zoom+pulse,x:pan,y:action==='jump'?-Math.sin(p*Math.PI)*9:0};
 }
 
 /* ---------- playback + recording ---------- */
@@ -407,17 +436,24 @@ function frame(now){
     let idx=0;for(let i=0;i<c.items.length;i++){if(c.items[i].start<=tt)idx=i}
     const it=c.items[idx],speaking=tt>=it.start&&tt<it.start+it.dur;
     if(it.scene!==play.scene){play.scene=it.scene;play.th=themeOf(c.st.scenes[it.scene].bg)}
-    drawBG(play.th,t);
     analyser.getFloatTimeDomainData(buf);let s=0;for(let i=0;i<buf.length;i++)s+=buf[i]*buf[i];
     const env=speaking&&!paused?Math.min(1,Math.pow(Math.sqrt(s/buf.length)*6,.8)):0;
     const cast=c.st.scenes[it.scene].cast,n=cast.length;
     const action=actionFor(it.text),progress=(tt-it.start)/Math.max(.1,it.dur);
+    const activeName=it.sp===NARR?cast[0]:it.sp;
+    const activeIndex=Math.max(0,cast.indexOf(activeName));
+    const actorX=W*(activeIndex+1)/(n+1)+actionMotion(action,progress,t,activeIndex).x;
+    const camera=cameraFor(action,progress,actorX);
+    ctx.save();ctx.translate(W/2,H/2);ctx.scale(camera.zoom,camera.zoom);ctx.translate(-W/2+camera.x,-H/2+camera.y);
+    drawBG(play.th,t);
     cast.forEach((name,i)=>{
       const sp=speaking&&it.sp===name;
-      const motion=actionMotion(action,progress,t,i);
+      const charAction=name===activeName?action:reactionFor(action);
+      const motion=actionMotion(charAction,progress,t,i);
       const x=W*(i+1)/(n+1)+motion.x;
       drawChar(c.st.chars[name],x,rigs[name].update(paused?0:dt,sp?env:0,sp),motion);
     });
+    ctx.restore();
     if(tt>=0)caption(it.text);
     if(tt>c.total&&!play.done){play.done=true;const f=play.onend;if(f)f()}
   }

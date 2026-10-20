@@ -10,7 +10,7 @@ Runs entirely in your browser (phone or laptop). No server, no account, no GPU, 
 
 - **Voice:** [Kokoro](https://github.com/hexgrad/kokoro) (82M-parameter open-weight TTS, Apache-2.0) via `kokoro-js`, running locally in the browser. The model (about 80 MB) downloads once and is cached by your browser.
 - **Lip-sync:** the mouth follows the loudness of the actual generated audio.
-- **Motion:** eased head sway, random blinks, nods and hand gestures on emphasis.
+- **Motion:** audio-reactive lip sync, blinks, head movement, and story-driven full-body poses for running, walking, jumping, falling, laughing, crying, cheering, waving, pointing, thinking, shrugging, and anger cues. Other visible characters can react instead of copying the speaker’s action.
 - **Video file:** the page records its own canvas and audio (MediaRecorder) and gives you an MP4 or WebM to download.
 
 ## Script format
@@ -37,6 +37,13 @@ Voices: af_heart, af_bella, af_nicole, af_sarah, bf_emma, am_michael, am_fenrir,
 ## Storytime motion cues
 
 Characters no longer need to remain planted in place. The animation reads each narration line for common physical actions and adds free, real-time movement: walking and running travel across the scene, jumps arc upward, falls dip, laughter bounces, and surprise/pointing/thinking add small acting motions. These cues are heuristic, so write clear action verbs in the narration for the best results. No paid API or remote video-generation service is used.
+
+## Story-driven staging
+
+- The active character performs the main action; other characters use a simpler reaction or idle pose.
+- Action-aware camera framing adds subtle push-ins and pans for emphasis, while captions remain screen-stable.
+- Movement cues are inferred from English action words, so clear, concrete narration produces more reliable acting.
+- The animation is deterministic 2D Canvas rigging and hand-drawn scenery, not a generative animation model. Some nuanced actions and interactions remain approximate.
 
 ## Automatic scene generation
 
