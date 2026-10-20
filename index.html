@@ -17,59 +17,83 @@ body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 Nunito,sys
 main{max-width:760px;margin:0 auto;padding:18px 16px 40px}
 h1{font:800 34px/1.05 "Baloo 2",system-ui,sans-serif;margin:6px 0 4px;letter-spacing:-.01em}
 .sub{color:var(--mute);margin:0 0 16px}
-.stage{position:relative;background:var(--stage);border-radius:18px;overflow:hidden;aspect-ratio:16/9;box-shadow:0 0 0 1px var(--line)}
+.stage{background:var(--stage);border-radius:18px;overflow:hidden;aspect-ratio:16/9;box-shadow:0 0 0 1px var(--line)}
 canvas{width:100%;height:100%;display:block}
-.cap{position:absolute;left:6%;right:6%;bottom:5%;text-align:center;color:#fff;font:700 clamp(13px,3.2vw,22px)/1.3 Nunito,sans-serif;background:rgba(10,10,30,.6);border-radius:12px;padding:8px 12px;display:none}
-.bar{display:flex;gap:8px;align-items:center;margin:12px 0}
+.bar{display:flex;gap:8px;align-items:center;margin:12px 0 6px;flex-wrap:wrap}
 button,select{font:700 16px Nunito,sans-serif;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:12px 16px;min-height:48px}
-button.go{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);flex:1;font-size:18px}
-button:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-.status{color:var(--mute);font-size:14px;margin-left:auto}
+button.go{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);flex:1;font-size:17px}
+button:disabled{opacity:.55}
+button:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.status{color:var(--mute);font-size:14px;min-height:22px;margin:4px 2px 0}
 label{display:block;font-weight:700;margin:16px 0 6px}
 textarea{width:100%;min-height:230px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:400 15px/1.5 Nunito,sans-serif;padding:14px;resize:vertical}
 select{width:100%}
-details{margin-top:18px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
+details,.result{margin-top:18px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
 summary{font-weight:700;cursor:pointer}
 code,pre{font:13px/1.5 ui-monospace,Menlo,monospace;background:rgba(127,127,160,.14);border-radius:6px}
 pre{padding:10px;overflow-x:auto}
+.result{display:none}
+.result video{width:100%;border-radius:12px;margin:8px 0}
+.dl{display:inline-block;background:var(--accent);color:var(--accent-ink);font-weight:700;padding:12px 18px;border-radius:12px;text-decoration:none}
+.note{color:var(--mute);font-size:14px}
 </style>
 </head>
 <body>
 <main>
 <h1>Story Theatre</h1>
-<p class="sub">Paste a story. A character tells it out loud, moves, blinks and talks along with the words.</p>
+<p class="sub">Paste a story. A free AI narrator reads it, and characters act it out. Then download the video.</p>
 
-<div class="stage"><canvas id="cv" width="960" height="540"></canvas><div class="cap" id="cap"></div></div>
+<div class="stage"><canvas id="cv" width="1280" height="720"></canvas></div>
 <div class="bar">
-  <button class="go" id="go">Tell my story</button>
+  <button class="go" id="watch">Watch it</button>
+  <button class="go" id="make">Make video file</button>
   <button id="pause" disabled>Pause</button>
-  <span class="status" id="st">Ready</span>
+</div>
+<div class="status" id="st" role="status">Ready. The first time, the narrator voice (about 80 MB) downloads once and is then kept on your device.</div>
+
+<div class="result" id="result">
+  <strong>Your video is ready</strong>
+  <video id="out" controls playsinline></video>
+  <a class="dl" id="dl" download="story.webm">Download video</a>
 </div>
 
 <label for="script">Your story</label>
 <textarea id="script" spellcheck="false"></textarea>
 
-<label for="voice">Voice</label>
-<select id="voice"></select>
+<label for="nv">Narrator voice</label>
+<select id="nv">
+  <option value="af_heart">Heart (woman, warm)</option>
+  <option value="af_bella">Bella (woman, expressive)</option>
+  <option value="af_nicole">Nicole (woman, soft)</option>
+  <option value="bf_emma">Emma (woman, British)</option>
+  <option value="am_michael">Michael (man)</option>
+  <option value="am_fenrir">Fenrir (man, deep)</option>
+  <option value="am_puck">Puck (man, lively)</option>
+  <option value="bm_george">George (man, British)</option>
+  <option value="bm_fable">Fable (man, British, storyteller)</option>
+</select>
 
 <details>
-<summary>Two or more characters, and scenes</summary>
-<p>Plain text works as it is: one character reads everything. To add more, use these lines:</p>
-<pre># Characters (the first one is the storyteller)
-@character Kaito | hair=#2a2030, shirt=#2a9d8f, style=short
-@character Mia | hair=#6b3a2a, shirt=#e76f51, style=long
+<summary>Narrator, characters and scenes</summary>
+<p>With plain text, one character reads the story. If you add characters, an off-screen <b>Narrator</b> reads any line that has no name, and each character speaks only their own lines:</p>
+<pre># Characters (voice is optional)
+@character Kaito | hair=#2a2030, shirt=#2a9d8f, style=short, voice=am_michael
+@character Mia | hair=#6b3a2a, shirt=#e76f51, style=long, voice=af_bella
 
 # New scene and background (words like night, forest, sea, village, dawn change the setting)
 [bg: moonlit forest]
 
-# Dialogue
+Once upon a time, a boy looked up at the moon.
+Narrator: Every night he wondered how it would feel to touch it.
 Mia: “You can’t catch the moon!”</pre>
+<p class="note">Voices: af_heart, af_bella, af_nicole, af_sarah, bf_emma, am_michael, am_fenrir, am_puck, bm_george, bm_fable.</p>
 </details>
+<p class="note">Everything runs on your own device and costs nothing. Voicing takes a while on phones; a few minutes of story can take a few minutes to prepare.</p>
 </main>
 
-<script>
-const SAMPLE = `@character Kaito | hair=#2a2030, shirt=#2a9d8f, style=short
-@character Mia | hair=#6b3a2a, shirt=#e76f51, style=long
+<script type="module">
+const SAMPLE = `@character Kaito | hair=#2a2030, shirt=#2a9d8f, style=short, voice=am_michael
+@character Mia | hair=#6b3a2a, shirt=#e76f51, style=long, voice=af_bella
 [bg: moonlit forest clearing at night]
 Once upon a time, a boy named Kaito lived at the edge of a quiet forest. Every night he looked up and wondered how it would feel to touch the moon.
 Mia: “You can’t catch the moon, Kaito. It’s much too far away!”
@@ -77,37 +101,45 @@ Kaito: “Then I’ll climb the tallest tree and find out for myself.”
 [bg: a village at dawn, warm morning sun]
 In the morning the whole village was laughing, and Kaito had never felt happier.`;
 const $ = s => document.querySelector(s);
-const cv = $('#cv'), ctx = cv.getContext('2d'), W = 960, H = 540, OUT = '#2d2328';
+const cv = $('#cv'), ctx = cv.getContext('2d'), W = 960, H = 540, OUT = '#2d2328', GAP = 0.4;
 $('#script').value = SAMPLE;
+const setMsg = m => { $('#st').textContent = m; };
+const tick = () => new Promise(r => setTimeout(r, 30));
 
 /* ---------- script parsing ---------- */
 const PAL = [{skin:'#f6d3b6',hair:'#2a2030',shirt:'#2a9d8f'},{skin:'#e9b998',hair:'#6b3a2a',shirt:'#e76f51'},{skin:'#d9a37c',hair:'#3a2a1a',shirt:'#e9c46a'},{skin:'#f3c9a8',hair:'#8a3b3b',shirt:'#6a7fdb'}];
-function shade(h){const n=parseInt(h.slice(1),16);const f=.88;return '#'+[(n>>16)&255,(n>>8)&255,n&255].map(v=>Math.round(v*f).toString(16).padStart(2,'0')).join('')}
-function parse(t){
-  const st={chars:{},scenes:[],teller:null};let sc=null;
+const CHAR_VOICES = ['am_michael','af_bella','bf_emma','am_puck','af_nicole','bm_george'];
+const NARR = 'Narrator';
+function shade(h){const n=parseInt(h.slice(1),16);return '#'+[(n>>16)&255,(n>>8)&255,n&255].map(v=>Math.round(v*.88).toString(16).padStart(2,'0')).join('')}
+function parse(t, narratorVoice){
+  const st={chars:{},scenes:[]};let sc=null;
   for(const raw of t.split('\n')){
     const l=raw.trim(); if(!l||l[0]==='#') continue;
     if(/^@character/i.test(l)){
       const parts=l.slice(10).split('|'); const name=parts[0].trim(); const p={};
       (parts[1]||'').split(',').forEach(kv=>{const i=kv.indexOf('=');if(i>0)p[kv.slice(0,i).trim()]=kv.slice(i+1).trim()});
-      st.chars[name]=p; if(!st.teller) st.teller=name; continue;
+      st.chars[name]=p; continue;
     }
     let m=l.match(/^\[bg:\s*(.*)\]$/i);
     if(m){sc={bg:m[1],lines:[]};st.scenes.push(sc);continue}
     if(!sc){sc={bg:'',lines:[]};st.scenes.push(sc)}
     m=l.match(/^([^:]{1,20}):\s*(.+)$/);
     let sp=null,body=l;
-    if(m&&st.chars[m[1].trim()]){sp=m[1].trim();body=m[2]}
+    if(m&&(st.chars[m[1].trim()]||m[1].trim()===NARR)){sp=m[1].trim();body=m[2]}
     sc.lines.push({sp,text:body.replace(/^[“"]|[”"]$/g,'')});
   }
-  if(!st.teller){st.teller='Storyteller';st.chars[st.teller]={}}
+  const hasChars=Object.keys(st.chars).length>0;
+  if(!hasChars)st.chars.Storyteller={};
+  const first=Object.keys(st.chars)[0];
   Object.keys(st.chars).forEach((n,i)=>{const p=st.chars[n],d=PAL[i%PAL.length];p.skin=p.skin||d.skin;p.hair=p.hair||d.hair;p.shirt=p.shirt||d.shirt;p.shade=shade(p.skin);p.style=p.style||'short';p.idx=i});
+  const pool=CHAR_VOICES.filter(v=>v!==narratorVoice);
+  Object.keys(st.chars).forEach((n,i)=>{const p=st.chars[n];p.voice=p.voice||(hasChars?pool[i%pool.length]:narratorVoice)});
   const queue=[];
   st.scenes.forEach((s,si)=>{
     const names=[];
-    s.lines.forEach(l=>{l.sp=l.sp||st.teller;if(!names.includes(l.sp))names.push(l.sp)});
-    s.cast=names.length?names:[st.teller];
-    s.lines.forEach(l=>{(l.text.match(/[^.!?]+[.!?]+["”]?|[^.!?]+$/g)||[l.text]).forEach(sen=>{sen=sen.trim();if(sen)queue.push({sp:l.sp,text:sen,scene:si})})});
+    s.lines.forEach(l=>{l.sp=l.sp||(hasChars?NARR:first);if(l.sp!==NARR&&!names.includes(l.sp))names.push(l.sp)});
+    s.cast=names.length?names:[first];
+    s.lines.forEach(l=>{(l.text.match(/[^.!?]+[.!?]+["”]?|[^.!?]+$/g)||[l.text]).forEach(sen=>{sen=sen.trim();if(sen)queue.push({sp:l.sp,text:sen,scene:si,voice:l.sp===NARR?narratorVoice:st.chars[l.sp].voice})})});
   });
   return {st,queue};
 }
@@ -174,8 +206,18 @@ function head(c,st){
   if(m<.07){ctx.beginPath();ctx.arc(cx,my-6,22,.3,2.85);ctx.lineWidth=4;ctx.strokeStyle=OUT;ctx.stroke()}
   else{const rx=14+12*m,ry=4+32*m;E(cx,my+ry*.3,rx,ry*.7,'#782a34',OUT);if(m>.4)E(cx,my+ry*.65,rx*.6,ry*.3,'#eb7882')}
 }
+function caption(text){
+  if(!text)return;
+  ctx.font='700 26px Nunito, system-ui, sans-serif';ctx.textAlign='center';
+  const maxW=W*.82,words=text.split(' '),rows=[];let cur='';
+  for(const w of words){const t=cur?cur+' '+w:w;if(ctx.measureText(t).width>maxW&&cur){rows.push(cur);cur=w}else cur=t}
+  rows.push(cur);
+  const lh=34,h=rows.length*lh+18,y0=H-h-22;
+  ctx.fillStyle='rgba(10,10,30,.62)';ctx.beginPath();ctx.roundRect(W*.07,y0,W*.86,h,14);ctx.fill();
+  ctx.fillStyle='#fff';rows.forEach((r,i)=>ctx.fillText(r,W/2,y0+30+i*lh));ctx.textAlign='start';
+}
 
-/* ---------- backgrounds (drawn live, slow camera drift) ---------- */
+/* ---------- backgrounds ---------- */
 function themeOf(bg){
   const b=(bg||'').toLowerCase(),h=[...b].reduce((a,ch)=>(a*31+ch.charCodeAt(0))%360,0);
   return{night:/night|moon|star|dark|midnight/.test(b),forest:/forest|tree|wood|jungle|garden/.test(b),sea:/sea|ocean|beach|lake|river|water/.test(b),
@@ -199,67 +241,116 @@ function drawBG(th,t){
     for(let i=0;i<9;i++){const x=i*125+dx*.9-30,h=210+(i%3)*60;P([[x,H*.78],[x+55,H*.78-h],[x+110,H*.78]],ctx.fillStyle)}}
 }
 
-/* ---------- performance ---------- */
-let rigs={},play=null,voices=[],paused=false;
-function loadVoices(){
-  voices=speechSynthesis.getVoices();const sel=$('#voice');sel.innerHTML='';
-  const en=voices.map((v,i)=>({v,i})).sort((a,b)=>(b.v.lang.startsWith('en'))-(a.v.lang.startsWith('en')));
-  en.forEach(({v,i})=>{const o=document.createElement('option');o.value=i;o.textContent=`${v.name} (${v.lang})`;sel.appendChild(o)});
+/* ---------- free AI narrator (Kokoro, runs in your browser) ---------- */
+let tts=null,actx=null,master=null,analyser=null,recDest=null,cache={key:'',items:null,st:null};
+async function loadTTS(){
+  if(tts)return tts;
+  setMsg('Loading the narrator (first time downloads about 80 MB)…');
+  let mod=null;
+  for(const url of ['https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm','https://esm.sh/kokoro-js@1.2.1']){
+    try{mod=await import(url);if(mod&&mod.KokoroTTS)break}catch(e){console.warn('import failed',url,e)}
+  }
+  if(!mod||!mod.KokoroTTS)throw new Error('Could not load the voice engine. Check your internet connection and try again.');
+  tts=await mod.KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{dtype:'q8',device:'wasm',
+    progress_callback:p=>{if(p&&p.status==='progress'&&typeof p.progress==='number')setMsg(`Downloading narrator… ${Math.round(p.progress)}%`)}});
+  return tts;
 }
-if('speechSynthesis' in window){loadVoices();speechSynthesis.onvoiceschanged=loadVoices}
-else $('#st').textContent='This browser can’t speak aloud';
+function ensureAudio(){
+  if(actx){if(actx.state==='suspended')actx.resume();return}
+  actx=new (window.AudioContext||window.webkitAudioContext)();
+  master=actx.createGain();analyser=actx.createAnalyser();analyser.fftSize=1024;
+  master.connect(analyser);analyser.connect(actx.destination);
+  recDest=actx.createMediaStreamDestination();master.connect(recDest);
+}
+async function prepare(){
+  const script=$('#script').value,nv=$('#nv').value,key=nv+'|'+script;
+  if(cache.key===key&&cache.items)return cache;
+  ensureAudio();
+  const {st,queue}=parse(script,nv);
+  if(!queue.length)throw new Error('Add some story text first.');
+  const t=await loadTTS(),items=[];let start=0;
+  for(let i=0;i<queue.length;i++){
+    setMsg(`Voicing line ${i+1} of ${queue.length}… (the page may pause while this runs)`);await tick();
+    const q=queue[i],a=await t.generate(q.text,{voice:q.voice});
+    const data=a.audio||a.data,sr=a.sampling_rate||24000;
+    const buf=actx.createBuffer(1,data.length,sr);buf.getChannelData(0).set(data);
+    items.push({...q,buf,start,dur:buf.duration});start+=buf.duration+GAP;
+  }
+  cache={key,items,st,total:start};
+  return cache;
+}
 
-function start(){
-  speechSynthesis.cancel();
-  const {st,queue}=parse($('#script').value);
-  if(!queue.length){$('#st').textContent='Add some story text first';return}
-  rigs={};Object.keys(st.chars).forEach((n,i)=>rigs[n]=new Rig(i+1));
-  play={st,queue,i:-1,cur:null,wp:0,lastB:0,th:null,scene:-1,t0:performance.now()};
-  $('#go').textContent='Start over';$('#pause').disabled=false;paused=false;$('#pause').textContent='Pause';
-  next();
+/* ---------- playback + recording ---------- */
+let rigs={},play=null,paused=false,rec=null,chunks=[];
+function stopPlay(){
+  if(play){play.srcs.forEach(s=>{try{s.stop()}catch(e){}});play=null}
+  if(rec&&rec.state!=='inactive'){rec.onstop=null;rec.stop()}
+  rec=null;paused=false;$('#pause').disabled=true;$('#pause').textContent='Pause';
 }
-function next(){
-  if(!play)return;play.i++;
-  if(play.i>=play.queue.length){play.cur=null;$('#st').textContent='The end';$('#cap').style.display='none';return}
-  const q=play.queue[play.i];play.cur=q;
-  if(q.scene!==play.scene){play.scene=q.scene;play.th=themeOf(play.st.scenes[q.scene].bg)}
-  const u=new SpeechSynthesisUtterance(q.text),v=voices[+$('#voice').value];
-  if(v){u.voice=v;u.lang=v.lang}
-  const ci=play.st.chars[q.sp].idx;u.pitch=[1,1.35,.8,1.15][ci%4];u.rate=.95;
-  u.onboundary=()=>{play.wp=1;play.lastB=performance.now()};
-  const done=()=>{if(play&&play.cur===q){play.cur=null;setTimeout(()=>{if(play&&!paused)next();else if(play)play.pendingNext=true},320)}};
-  u.onend=done;u.onerror=done;
-  $('#cap').textContent=q.text;$('#cap').style.display='block';
-  $('#st').textContent=`Line ${play.i+1} of ${play.queue.length}`;
-  speechSynthesis.speak(u);
+function begin(c,onend){
+  stopPlay();ensureAudio();
+  rigs={};Object.keys(c.st.chars).forEach((n,i)=>rigs[n]=new Rig(i+1));
+  const t0=actx.currentTime+.4,srcs=[];
+  c.items.forEach(it=>{const s=actx.createBufferSource();s.buffer=it.buf;s.connect(master);s.start(t0+it.start);srcs.push(s)});
+  play={c,t0,srcs,onend,th:null,scene:-1,done:false};
+  $('#pause').disabled=false;
 }
-$('#go').onclick=start;
-$('#pause').onclick=()=>{
+function startRecording(){
+  const stream=cv.captureStream(30);
+  recDest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+  const mime=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m));
+  if(!mime)throw new Error('This browser can’t record video. Try Chrome, Edge or Safari.');
+  chunks=[];rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:5000000});
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  rec.onstop=()=>{
+    const type=mime.split(';')[0],blob=new Blob(chunks,{type}),url=URL.createObjectURL(blob);
+    $('#out').src=url;const a=$('#dl');a.href=url;a.download='story.'+(type.includes('mp4')?'mp4':'webm');
+    $('#result').style.display='block';$('#result').scrollIntoView({behavior:'smooth',block:'center'});
+    setMsg('Done. Your video is ready below.');busy(false);
+  };
+  rec.start(500);
+}
+function busy(b){$('#watch').disabled=b;$('#make').disabled=b}
+async function run(record){
+  busy(true);$('#result').style.display='none';
+  try{
+    const c=await prepare();
+    setMsg(record?'Recording your video… keep this page open.':'Playing…');
+    begin(c,()=>{setMsg(record?'Finishing the file…':'The end.');if(record){setTimeout(()=>{if(rec&&rec.state!=='inactive')rec.stop()},700)}else busy(false)});
+    if(record)startRecording();
+  }catch(e){setMsg(e.message||String(e));busy(false);stopPlay()}
+}
+$('#watch').onclick=()=>run(false);
+$('#make').onclick=()=>run(true);
+$('#pause').onclick=async()=>{
   if(!play)return;paused=!paused;$('#pause').textContent=paused?'Resume':'Pause';
-  if(paused)speechSynthesis.pause();else{speechSynthesis.resume();if(play.pendingNext){play.pendingNext=false;next()}}
+  if(paused)await actx.suspend();else await actx.resume();
 };
 
-let last=performance.now();
+let last=performance.now(),idle=null;
+const buf=new Float32Array(1024);
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;const t=now/1000;
-  if(!play){drawBG({night:true,forest:true,hue:250},t);
-    if(!window._idle){window._idle={c:Object.assign({idx:0,style:'short',shade:shade(PAL[0].skin)},PAL[0]),r:new Rig(1)}}
-    drawChar(window._idle.c,W*.5,window._idle.r.update(dt,0,false))}
-  else{
-    drawBG(play.th||themeOf(''),t);
-    const sc=play.st.scenes[Math.max(0,play.scene)],cur=play.cur;
-    if(cur&&!paused){
-      const age=now-play.lastB;
-      if(age>340){play.wp=.55+Math.random()*.45;play.lastB=now}
-    }
-    play.wp*=Math.exp(-dt*7);
-    const syl=Math.abs(Math.sin(t*14));
-    const env=(cur&&!paused)?Math.min(1,.12+.25*syl+.75*play.wp*(.6+.4*syl)):0;
-    const n=sc.cast.length;
-    sc.cast.forEach((name,i)=>{
-      const sp=cur&&cur.sp===name&&!paused;
-      drawChar(play.st.chars[name],W*(i+1)/(n+1),rigs[name].update(paused?0:dt,sp?env:0,sp));
+  ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
+  if(!play){
+    drawBG({night:true,forest:true,hue:250},t);
+    if(!idle)idle={c:Object.assign({idx:0,style:'short',shade:shade(PAL[0].skin)},PAL[0]),r:new Rig(1)};
+    drawChar(idle.c,W*.5,idle.r.update(dt,0,false));
+  }else{
+    const {c}=play,tt=actx.currentTime-play.t0;
+    let idx=0;for(let i=0;i<c.items.length;i++){if(c.items[i].start<=tt)idx=i}
+    const it=c.items[idx],speaking=tt>=it.start&&tt<it.start+it.dur;
+    if(it.scene!==play.scene){play.scene=it.scene;play.th=themeOf(c.st.scenes[it.scene].bg)}
+    drawBG(play.th,t);
+    analyser.getFloatTimeDomainData(buf);let s=0;for(let i=0;i<buf.length;i++)s+=buf[i]*buf[i];
+    const env=speaking&&!paused?Math.min(1,Math.pow(Math.sqrt(s/buf.length)*6,.8)):0;
+    const cast=c.st.scenes[it.scene].cast,n=cast.length;
+    cast.forEach((name,i)=>{
+      const sp=speaking&&it.sp===name;
+      drawChar(c.st.chars[name],W*(i+1)/(n+1),rigs[name].update(paused?0:dt,sp?env:0,sp));
     });
+    if(tt>=0)caption(it.text);
+    if(tt>c.total&&!play.done){play.done=true;const f=play.onend;if(f)f()}
   }
   requestAnimationFrame(frame);
 }
