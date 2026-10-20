@@ -37,3 +37,7 @@ Voices: af_heart, af_bella, af_nicole, af_sarah, bf_emma, am_michael, am_fenrir,
 ## Storytime motion cues
 
 Characters no longer need to remain planted in place. The animation reads each narration line for common physical actions and adds free, real-time movement: walking and running travel across the scene, jumps arc upward, falls dip, laughter bounces, and surprise/pointing/thinking add small acting motions. These cues are heuristic, so write clear action verbs in the narration for the best results. No paid API or remote video-generation service is used.
+
+## Automatic scene generation
+
+Story Theater now attempts to infer common settings from ordinary narration (for example school, bedroom, kitchen, office, city street, beach, forest, park, shop, and cafe). Use explicit `[bg: ...]` lines whenever you want to guarantee a location change. Action words such as walked, ran, jumped, fell, laughed, gasped, pointed, and wondered drive movement cues. The generator uses hand-drawn Canvas scenery and local/browser animation; it does not call a paid video-generation API. Scene and action inference is heuristic, so review the preview and add explicit scene cues for unusual settings or subtle transitions.
