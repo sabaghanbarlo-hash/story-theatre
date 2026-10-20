@@ -220,9 +220,9 @@ function drawChar(c,x,st,motion={}){
   const stride=(action==='walk'?24:action==='run'?39:0)*Math.sin(phase);
   const bounce=(action==='run'?Math.abs(Math.sin(phase))*13:action==='walk'?Math.abs(Math.sin(phase))*4:action==='jump'?Math.sin(phase)*6:Math.sin(phase*.5)*1.5);
   const lean=action==='run'?.13:action==='walk'?.045:action==='fall'?.4:0;
-  ctx.save();ctx.translate(x,H*.9-(motion.lift||0));ctx.scale(scale,scale);ctx.translate(0,-500+bounce);ctx.rotate(lean);
+  ctx.save();ctx.translate(x,H*.9-(motion.lift||0));ctx.scale(scale,scale);ctx.translate(0,-442+bounce);ctx.rotate(lean);
   // soft contact shadow anchors the feet to the scene
-  ctx.save();ctx.globalAlpha=.16;E(0,493,43,7,'#28233a');ctx.restore();
+  ctx.save();ctx.globalAlpha=.16;E(0,446,43,7,'#28233a');ctx.restore();
   // Legs are separate articulated limbs with visible knees and shoes.
   const legs=[{hip:-15,phase:stride},{hip:15,phase:-stride}];
   for(const leg of legs){
