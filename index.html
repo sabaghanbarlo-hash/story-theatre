@@ -141,45 +141,72 @@ function direct(text, bgText, ds, isActor, manual) {
 }
 function shade(h) { const n = parseInt(h.slice(1), 16); return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => Math.round(v * .88).toString(16).padStart(2, '0')).join(''); }
 function parse(t, narratorVoice) {
-  const st = { chars: {}, scenes: [] }; let sc = null, pend = {};
-  for (const raw of t.split('\n')) {
-    const l = raw.trim(); if (!l || l[0] === '#') continue;
-    if (/^@character/i.test(l)) {
-      const parts = l.slice(10).split('|'); const name = parts[0].trim(); const p = {};
-      (parts[1] || '').split(',').forEach(kv => { const i = kv.indexOf('='); if (i > 0) p[kv.slice(0, i).trim()] = kv.slice(i + 1).trim(); });
-      st.chars[name] = p; continue;
+  const st = { chars: {}, scenes: [] };
+  let sc = null, pend = {};
+  // Accept Windows, Unix, and pasted multiline text reliably.
+  for (const raw of String(t || '').split(/\r?\n/)) {
+    const l = raw.trim();
+    if (!l || l[0] === '#') continue;
+    if (/^@character\b/i.test(l)) {
+      const parts = l.slice(10).split('|');
+      const name = parts[0].trim();
+      if (!name) continue;
+      const p = {};
+      (parts[1] || '').split(',').forEach(kv => {
+        const i = kv.indexOf('=');
+        if (i > 0) p[kv.slice(0, i).trim()] = kv.slice(i + 1).trim();
+      });
+      st.chars[name] = p;
+      continue;
     }
-    let m = l.match(/^\[(bg|action|prop):\s*(.*)\]$/i);
+    const m = l.match(/^\[(bg|action|prop):\s*(.*)\]$/i);
     if (m) {
       const k = m[1].toLowerCase();
-      if (k === 'bg') { sc = { bg: m[2], lines: [] }; st.scenes.push(sc); pend.bg = m[2]; }
-      else if (k === 'action') pend.act = m[2].trim().toLowerCase();
-      else pend.props = m[2].toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+      if (k === 'bg') {
+        sc = { bg: m[2], lines: [] };
+        st.scenes.push(sc);
+        pend.bg = m[2];
+      } else if (k === 'action') pend.act = m[2].trim().toLowerCase();
+      else pend.props = m[2].toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
       continue;
     }
     if (!sc) { sc = { bg: '', lines: [] }; st.scenes.push(sc); }
-    m = l.match(/^([^:]{1,20}):\s*(.+)$/);
+    const speakerMatch = l.match(/^([^:]{1,20}):\s*(.+)$/);
     let sp = null, body = l;
-    if (m && (st.chars[m[1].trim()] || m[1].trim() === NARR)) { sp = m[1].trim(); body = m[2]; }
-    sc.lines.push({ sp, text: body.replace(/^[“"]|[”"]$/g, ''), manual: pend.act || pend.props ? { act: pend.act, props: pend.props } : null, bg: pend.bg || '' });
+    if (speakerMatch && (Object.prototype.hasOwnProperty.call(st.chars, speakerMatch[1].trim()) || speakerMatch[1].trim() === NARR)) {
+      sp = speakerMatch[1].trim();
+      body = speakerMatch[2];
+    }
+    sc.lines.push({
+      sp,
+      text: body.replace(/^[“"]|[”"]$/g, ''),
+      manual: pend.act || pend.props ? { act: pend.act, props: pend.props } : null,
+      bg: pend.bg || ''
+    });
     pend = {};
   }
   const hasChars = Object.keys(st.chars).length > 0;
   if (!hasChars) st.chars.Storyteller = {};
   const names = Object.keys(st.chars), first = names[0];
-  names.forEach((n, i) => { const p = st.chars[n], d = PAL[i % PAL.length]; p.color = p.color || d.color; p.face = p.face || '#ffffff'; p.hat = p.hat || ''; p.idx = i; });
+  names.forEach((n, i) => {
+    const p = st.chars[n], d = PAL[i % PAL.length];
+    p.color = p.color || d.color; p.face = p.face || '#ffffff'; p.hat = p.hat || ''; p.idx = i;
+  });
   const pool = CHAR_VOICES.filter(v => v !== narratorVoice);
-  names.forEach((n, i) => { const p = st.chars[n]; p.voice = p.voice || (hasChars ? pool[i % pool.length] : narratorVoice); });
+  names.forEach((n, i) => {
+    const p = st.chars[n];
+    p.voice = p.voice || (hasChars ? pool[i % pool.length] : narratorVoice);
+  });
   st.hero = first;
   const queue = [], ds = { terr: 'meadow', night: false };
-  st.scenes.forEach((s, si) => {
-    s.lines.forEach(l => {
-      l.sp = l.sp || (hasChars ? NARR : first);
-      const sens = (l.text.match(/[^.!?]+[.!?]+["”]?|[^.!?]+$/g) || [l.text]).map(x => x.trim()).filter(Boolean);
-      sens.forEach((sen, k) => {
-        const actor = l.sp === NARR || l.sp === first;
-        const b = direct(sen, k === 0 ? l.bg : '', ds, actor, k === 0 ? l.manual : null);
-        queue.push({ sp: l.sp, text: sen, scene: si, voice: l.sp === NARR ? narratorVoice : st.chars[l.sp].voice, ...b });
+  st.scenes.forEach((scene, si) => {
+    scene.lines.forEach(lineItem => {
+      lineItem.sp = lineItem.sp || (hasChars ? NARR : first);
+      const sentences = (lineItem.text.match(/[^.!?]+[.!?]+["”]?|[^.!?]+$/g) || [lineItem.text]).map(x => x.trim()).filter(Boolean);
+      sentences.forEach((sentence, k) => {
+        const actor = lineItem.sp === NARR || lineItem.sp === first;
+        const b = direct(sentence, k === 0 ? lineItem.bg : '', ds, actor, k === 0 ? lineItem.manual : null);
+        queue.push({ sp: lineItem.sp, text: sentence, scene: si, voice: lineItem.sp === NARR ? narratorVoice : st.chars[lineItem.sp].voice, ...b });
       });
     });
   });
